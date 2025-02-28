@@ -10,11 +10,13 @@ A modern service that turns email newsletters into RSS feeds, built with Cloudfl
 - **RSS Generation**: Serves standards-compliant RSS feeds
 - **Admin Interface**: Simple management UI for feeds and emails
 - **Storage**: Uses Cloudflare KV for efficient, low-cost storage
+- **Deletion Support**: Email content can be removed from feeds, with cache updates
 
 ## Architecture
 
 ### Email Flow
-1. A newsletter arrives at `newsletter-XYZ@yourdomain.com`
+
+1. A newsletter arrives at `apple.mountain.42@yourdomain.com` (feed ID format: noun1.noun2.XX)
 2. ForwardEmail.net forwards it to your Cloudflare Worker
 3. The Worker parses the email, extracts content, and stores it in KV
 4. The RSS feed is updated with the new content
@@ -24,6 +26,16 @@ A modern service that turns email newsletters into RSS feeds, built with Cloudfl
 - **Email Parser**: Lightweight custom parser that works in edge environments
 - **Feed Generator**: Modern RSS feed generator with minimal dependencies
 - **Admin UI**: Simple interface to manage feeds and view emails
+- **ID Generator**: Creates memorable, collision-resistant feed IDs
+- **Data Store**: Organized module for common nouns used in ID generation
+
+### Code Structure
+
+- **src/routes/**: API and UI route handlers
+- **src/utils/**: Utility functions including email parsing and ID generation
+- **src/data/**: Data files like the nouns list for feed IDs
+- **src/types/**: TypeScript type definitions
+- **src/index.ts**: Main application entry point
 
 ## Development
 
@@ -47,7 +59,6 @@ npm run deploy
 
 - `ADMIN_PASSWORD`: Password for the admin interface
 - `DOMAIN`: Your custom domain for receiving emails
-- `FORWARDEMAIL_TOKEN`: Token for ForwardEmail.net webhook authentication
 
 ## Technology Stack
 
@@ -75,6 +86,21 @@ This project follows a minimalist approach:
 - No Node.js-specific modules or polyfills
 - Modern TypeScript features
 - Clean, maintainable code structure
+- Modular organization for improved maintainability
+
+## Feed ID System
+
+The system generates memorable, user-friendly feed IDs in the format `noun1.noun2.XX` where:
+
+- `noun1` and `noun2` are randomly selected from a curated list of ~500 common nouns
+- `XX` is a random two-digit number between 10 and 99
+
+This format provides:
+
+- Easy to read and share email addresses
+- Low collision probability (can handle thousands of feeds)
+- Simple to remember for users
+- ~22.5 million possible combinations
 
 ## License
 

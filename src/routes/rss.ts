@@ -33,8 +33,8 @@ export async function handle(c: Context): Promise<Response> {
     const feedConfig = await emailStorage.get(feedConfigKey, 'json') as FeedConfig | null || {
       title: `Newsletter Feed ${feedId}`,
       description: 'Converted email newsletter',
-      site_url: `https://api.${env.DOMAIN}/rss/${feedId}`,
-      feed_url: `https://api.${env.DOMAIN}/rss/${feedId}`,
+      site_url: `https://${env.DOMAIN}/rss/${feedId}`,
+      feed_url: `https://${env.DOMAIN}/rss/${feedId}`,
       language: 'en',
       created_at: Date.now()
     };
@@ -52,7 +52,7 @@ export async function handle(c: Context): Promise<Response> {
     }
     
     // Generate the RSS feed XML
-    const baseUrl = `https://api.${env.DOMAIN}`;
+    const baseUrl = `https://${env.DOMAIN}`;
     const rssXml = generateRssFeed(feedConfig, emailsData, baseUrl);
     
     // Return the RSS feed with appropriate content type

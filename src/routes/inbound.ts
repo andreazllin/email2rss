@@ -40,13 +40,22 @@ export async function handle(c: Context): Promise<Response> {
       contentType: payload.html ? 'HTML' : 'Text'
     });
     
-    // Extract feed ID from email address (e.g., newsletter-xyz@domain.com -> xyz)
+    // Extract feed ID from email address (e.g., apple.mountain.42@domain.com -> apple.mountain.42)
     const toAddress = payload.recipients?.[0] || '';
     const feedId = EmailParser.extractFeedId(toAddress);
     
     if (!feedId) {
       console.error(`Invalid email address format: ${toAddress}`);
       return new Response('Invalid email address format', { status: 400 });
+    }
+    
+    // Check if the feed exists by looking up the feed configuration
+    const feedConfigKey = `feed:${feedId}:config`;
+    const feedConfig = await env.EMAIL_STORAGE.get(feedConfigKey, 'json');
+    
+    if (!feedConfig) {
+      console.error(`Feed with ID ${feedId} does not exist or has been deleted`);
+      return new Response('Feed does not exist', { status: 404 });
     }
     
     // Parse the email using our simplified parser

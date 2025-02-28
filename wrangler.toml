@@ -23,8 +23,6 @@ workers_dev = true
 # Add any production-specific configuration here
 workers_dev = false
 routes = [
-  "https://api.getmynews.app/api/*",
-  "https://api.getmynews.app/rss/*",
   "https://getmynews.app/*",
   "https://www.getmynews.app/*"
 ] 

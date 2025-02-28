@@ -2,14 +2,81 @@ import { Hono } from 'hono';
 import { handle as handleInbound } from './routes/inbound';
 import { handle as handleRSS } from './routes/rss';
 import { handle as handleAdmin } from './routes/admin';
-import { Context, Next } from 'hono';
 import { Env } from './types';
 
 // Define allowed origins for CORS
-const ALLOWED_ORIGINS = ['https://getmynews.app', 'https://api.getmynews.app'];
+const ALLOWED_ORIGINS = ['https://getmynews.app', 'https://www.getmynews.app'];
+
+// Fallback ForwardEmail.net IP addresses in case API fetch fails
+const FALLBACK_FORWARD_EMAIL_IPS = [
+  '138.197.213.185', // mx1.forwardemail.net
+  '121.127.44.56',   // mx1.forwardemail.net (alternate)
+  '104.248.224.170'  // mx2.forwardemail.net
+];
 
 // Create the main Hono app
 const app = new Hono();
+
+// Cache for ForwardEmail.net IPs with expiration
+let forwardEmailIpsCache: {
+  ips: string[];
+  expiresAt: number;
+} | null = null;
+
+// Function to fetch ForwardEmail.net IPs from their API
+async function getForwardEmailIps(): Promise<string[]> {
+  try {
+    // Return from cache if available and not expired
+    if (forwardEmailIpsCache && forwardEmailIpsCache.expiresAt > Date.now()) {
+      return forwardEmailIpsCache.ips;
+    }
+    
+    // Fetch the latest IPs from ForwardEmail.net
+    const response = await fetch('https://forwardemail.net/ips/v4.json', {
+      headers: {
+        'User-Agent': 'Email-to-RSS/1.0',
+      },
+      cf: {
+        cacheTtl: 3600, // Cache for 1 hour in Cloudflare's cache
+        cacheEverything: true,
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch IPs: ${response.status}`);
+    }
+    
+    // Define the expected type for the API response
+    interface IpEntry {
+      hostname: string;
+      ipv4: string[];
+      updated: string;
+    }
+    
+    const data = await response.json() as IpEntry[];
+    
+    // Extract IPs for mx1 and mx2 servers
+    const mxIps = data
+      .filter(entry => 
+        entry.hostname === 'mx1.forwardemail.net' || 
+        entry.hostname === 'mx2.forwardemail.net'
+      )
+      .flatMap(entry => entry.ipv4);
+    
+    // Store in cache for 24 hours
+    forwardEmailIpsCache = {
+      ips: mxIps,
+      expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+    };
+    
+    console.log('Fetched ForwardEmail.net IPs:', mxIps);
+    return mxIps;
+  } catch (error) {
+    console.error('Error fetching ForwardEmail.net IPs:', error);
+    // Return fallback IPs if fetch fails
+    return FALLBACK_FORWARD_EMAIL_IPS;
+  }
+}
 
 // CORS middleware
 app.use('*', async (c, next) => {
@@ -29,44 +96,34 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-// Create auth middleware function
-const authMiddleware = async (c: Context, next: Next) => {
-  const authHeader = c.req.header('Authorization');
+// Webhook security middleware for /api/inbound - verify ForwardEmail.net IP
+app.use('/api/inbound', async (c, next) => {
+  // Get the client IP
+  const clientIP = c.req.header('CF-Connecting-IP') || // Cloudflare-specific header
+                   c.req.header('X-Forwarded-For')?.split(',')[0].trim() ||
+                   c.req.raw.headers.get('x-real-ip') ||
+                   '0.0.0.0';
   
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
-    c.header('WWW-Authenticate', 'Basic realm="Admin Area"');
+  // Get the latest ForwardEmail.net IPs
+  const allowedIps = await getForwardEmailIps();
+  
+  // Check if the request is coming from ForwardEmail.net
+  if (!allowedIps.includes(clientIP)) {
+    console.error(`Unauthorized webhook request from IP: ${clientIP}`);
     return c.text('Unauthorized', 401);
   }
   
-  const base64Credentials = authHeader.split(' ')[1];
-  const credentials = atob(base64Credentials);
-  const [username, password] = credentials.split(':');
-  
-  // Check against environment variable
-  const env = c.env as unknown as Env;
-  const adminPassword = env.ADMIN_PASSWORD;
-  
-  if (username !== 'admin' || password !== adminPassword) {
-    c.header('WWW-Authenticate', 'Basic realm="Admin Area"');
-    return c.text('Unauthorized', 401);
-  }
-  
+  console.log(`Authorized webhook request from ForwardEmail.net (${clientIP})`);
   await next();
-};
-
-// Apply auth middleware to admin routes
-app.use('/admin/*', authMiddleware);
-
-// Also apply auth middleware to root path
-app.use('/', authMiddleware);
+});
 
 // Route handlers
 app.post('/api/inbound', handleInbound);
 app.get('/rss/:feedId', handleRSS);
 app.route('/admin', handleAdmin);
 
-// Root path uses admin handler
-app.route('/', handleAdmin);
+// Root path redirects to admin dashboard
+app.get('/', (c) => c.redirect('/admin'));
 
 // Catch-all for 404s
 app.all('*', (c) => c.text('Not Found', 404));

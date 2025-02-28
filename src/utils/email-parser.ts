@@ -6,11 +6,12 @@ import { EmailData } from '../types';
 export class EmailParser {
   /**
    * Extract the feed ID from an email address
-   * @param emailAddress The email address (e.g., newsletter-xyz@domain.com)
+   * @param emailAddress The email address (e.g., apple.mountain.42@domain.com)
    * @returns The feed ID or null if not found
    */
   static extractFeedId(emailAddress: string): string | null {
-    const match = emailAddress.match(/^newsletter-([a-zA-Z0-9]+)@/);
+    // Match pattern for noun1.noun2.XY before the @ symbol
+    const match = emailAddress.match(/^([a-z]+\.[a-z]+\.\d{2})@/i);
     return match ? match[1] : null;
   }
   
