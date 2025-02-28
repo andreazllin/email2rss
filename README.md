@@ -12,7 +12,7 @@ There are some free services online that do the same thing (e.g. [kill-the-newsl
 - **Risk of blocklisting**: being forced to use the same domain (@kill-the-newsletter.com) as everyone else increases the likelihood that an email newsletter can blocklist you from signing up.
 - **Self-hosting is non-trivial**: Kill The Newsletter is also [open source](https://github.com/leafac/kill-the-newsletter), but the self-hosting steps seem neither straightforward nor does it focus on exclusively leveraging free services.
 
-On the other hand, while Email-to-RSS isn't necessarily a one-click-deploy solution, it works just as well, is customized to your domain, and is completely free (except for the custom domain itself)!
+On the other hand, while Email-to-RSS isn't necessarily a one-click-deploy solution, it works just as well, is customized to your domain, and is **almost** free (you still need to buy a custom domain)!
 
 ## Features
 
@@ -30,6 +30,7 @@ On the other hand, while Email-to-RSS isn't necessarily a one-click-deploy solut
 ## Setup
 
 1. Buy your custom domain. You can buy it directly from Cloudflare for convenience. If purchased elsewhere, add the domain to your Cloudflare account to manage the DNS there.
+   1. **IMPORTANT!** Make sure your domain name extension (e.g. `.com`) is one of the ones allowed by [ForwardEmail.com's free tier](https://forwardemail.net/en/faq#what-domain-name-extensions-can-be-used-for-free).
 2. Clone this repository.
 3. Open your command line in the cloned repo folder and run: `bash setup.sh` – this will install dependencies and set up the Cloudflare Worker/KV with your admin password.
 4. Set up your ForwardEmail.net account and configure it to forward to Cloudflare (replace `yourdomain.com` with your custom domain):
