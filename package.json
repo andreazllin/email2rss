@@ -12,16 +12,16 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250224.0",
-    "@types/mailparser": "^3.4.5",
+    "@cloudflare/workers-types": "^4.20250524.0",
+    "@types/mailparser": "^3.4.6",
     "@types/rss": "^0.0.32",
-    "prettier": "^3.5.2",
-    "typescript": "^5.7.3",
-    "wrangler": "^3.111.0"
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3",
+    "wrangler": "^4.16.1"
   },
   "dependencies": {
-    "feed": "^4.2.2",
-    "hono": "^3.12.8",
-    "zod": "^3.22.4"
+    "feed": "^5.0.1",
+    "hono": "^4.7.10",
+    "zod": "^3.25.28"
   }
 }
