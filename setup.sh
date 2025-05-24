@@ -19,41 +19,42 @@ fi
 
 # Install dependencies
 echo "📦 Installing dependencies..."
-npm install
+npm install &> /dev/null
 
 # Check if user is logged in to Cloudflare
 echo "🔒 Checking Cloudflare authentication..."
-if ! npx wrangler whoami &>/dev/null; then
+if npx wrangler whoami | grep -q "You are not authenticated"; then
   echo "❌ You are not logged in to Cloudflare. Please run:"
-  echo "npx wrangler login"
-  echo "After login completes, run this setup script again."
+  echo "🔥 \`npx wrangler login\`"
+  echo "⚠️ After login completes, run this setup script again."
   exit 1
 fi
 echo "✅ Cloudflare authentication verified"
 
 # Function to get KV namespace IDs
 get_kv_namespace_ids() {
-  echo "ℹ️ Retrieving KV namespace IDs..."
-  
+  echo "🔍 Retrieving KV namespace IDs..."
+
   # Get the complete KV namespace list
   local output
-  output=$(npx wrangler kv:namespace list 2>/dev/null)
-  
-  if [ $? -ne 0 ]; then
+  output=$(npx wrangler kv namespace list 2>/dev/null)
+
+  if [ -z "$output" ]; then
     echo "❌ Error listing KV namespaces. Please check your Cloudflare authentication."
     return 1
   fi
-  
+
   # Try the direct approach first (most reliable)
   MAIN_ID=$(echo "$output" | grep -o '"id": *"[^"]*"' | head -1 | cut -d'"' -f4)
   PREVIEW_ID=$(echo "$output" | grep -o '"id": *"[^"]*"' | head -2 | tail -1 | cut -d'"' -f4)
-  
+
   # If the direct approach failed, try to match by namespace title
   if [ -z "$MAIN_ID" ] || [ -z "$PREVIEW_ID" ]; then
     # Save the output to a file for more complex processing
-    local temp_file=$(mktemp)
+    local temp_file
+    temp_file=$(mktemp)
     echo "$output" > "$temp_file"
-    
+
     # Try with different patterns
     if [ -z "$MAIN_ID" ]; then
       MAIN_ID=$(grep -A3 "email-to-rss-EMAIL_STORAGE\"" "$temp_file" | grep -o '"id": "[^"]*"' | head -1 | cut -d'"' -f4)
@@ -61,18 +62,18 @@ get_kv_namespace_ids() {
         MAIN_ID=$(grep -A3 "email-to-rss-EMAIL_STORAGE\"" "$temp_file" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
       fi
     fi
-    
+
     if [ -z "$PREVIEW_ID" ]; then
       PREVIEW_ID=$(grep -A3 "email-to-rss-EMAIL_STORAGE_preview\"" "$temp_file" | grep -o '"id": "[^"]*"' | head -1 | cut -d'"' -f4)
       if [ -z "$PREVIEW_ID" ]; then
         PREVIEW_ID=$(grep -A3 "email-to-rss-EMAIL_STORAGE_preview\"" "$temp_file" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
       fi
     fi
-    
+
     # Clean up
     rm -f "$temp_file"
   fi
-  
+
   # Check if we found both IDs
   if [ -z "$MAIN_ID" ] || [ -z "$PREVIEW_ID" ]; then
     echo "❌ Failed to extract KV namespace IDs. Please run manually:"
@@ -80,18 +81,17 @@ get_kv_namespace_ids() {
     echo "And update the IDs in wrangler.toml"
     return 1
   fi
-  
+
   return 0
 }
 
 # Create KV namespaces (suppressing output)
 echo "🗄️ Creating KV namespaces..."
-npx wrangler kv:namespace create EMAIL_STORAGE > /dev/null 2>&1 || true
-npx wrangler kv:namespace create EMAIL_STORAGE --preview > /dev/null 2>&1 || true
+npx wrangler kv namespace create EMAIL_STORAGE > /dev/null 2>&1 || true
+npx wrangler kv namespace create EMAIL_STORAGE --preview > /dev/null 2>&1 || true
 
 # Get KV namespace IDs
-get_kv_namespace_ids
-if [ $? -ne 0 ]; then
+if ! get_kv_namespace_ids; then
   echo "⚠️ Will continue without KV namespace IDs"
   KV_ID=""
   KV_PREVIEW_ID=""
@@ -119,7 +119,7 @@ fi
 
 # Set up admin password
 echo "🔐 Setting up admin password..."
-read -p "Enter admin password: " admin_password
+read -r -p "Enter admin password: " admin_password
 
 echo "Setting admin password for production environment..."
 # Initialize SETUP_SUCCESS if not already set
@@ -134,7 +134,7 @@ else
   # Run the command and capture its output
   SECRET_OUTPUT=$(echo "$admin_password" | npx wrangler secret put ADMIN_PASSWORD --env production --name email-to-rss 2>&1)
   SECRET_STATUS=$?
-  
+
   if [ $SECRET_STATUS -ne 0 ]; then
     echo "⚠️ Failed to set admin password for production environment"
     echo "Error: $SECRET_OUTPUT"
@@ -145,7 +145,7 @@ else
 fi
 
 # Prompt for domain
-read -p "Enter your domain (e.g., yourdomain.com): " domain
+read -r -p "Enter your domain (e.g., yourdomain.com): " domain
 if [ -z "$domain" ]; then
   echo "❌ No domain provided. Cannot continue."
   SETUP_SUCCESS=false
@@ -168,19 +168,19 @@ cp wrangler-example.toml wrangler.toml
 if [[ "$OSTYPE" == "darwin"* ]]; then
   # macOS requires empty string for -i
   sed -i '' "s/REPLACE_WITH_YOUR_DOMAIN/$domain/g" wrangler.toml
-  if [ ! -z "$KV_ID" ]; then
+  if [ -n "$KV_ID" ]; then
     sed -i '' "s/REPLACE_WITH_YOUR_KV_NAMESPACE_ID/$KV_ID/g" wrangler.toml
   fi
-  if [ ! -z "$KV_PREVIEW_ID" ]; then
+  if [ -n "$KV_PREVIEW_ID" ]; then
     sed -i '' "s/REPLACE_WITH_YOUR_PREVIEW_KV_NAMESPACE_ID/$KV_PREVIEW_ID/g" wrangler.toml
   fi
 else
   # Linux and others
   sed -i "s/REPLACE_WITH_YOUR_DOMAIN/$domain/g" wrangler.toml
-  if [ ! -z "$KV_ID" ]; then
+  if [ -n "$KV_ID" ]; then
     sed -i "s/REPLACE_WITH_YOUR_KV_NAMESPACE_ID/$KV_ID/g" wrangler.toml
   fi
-  if [ ! -z "$KV_PREVIEW_ID" ]; then
+  if [ -n "$KV_PREVIEW_ID" ]; then
     sed -i "s/REPLACE_WITH_YOUR_PREVIEW_KV_NAMESPACE_ID/$KV_PREVIEW_ID/g" wrangler.toml
   fi
 fi
@@ -189,4 +189,4 @@ echo "✅ wrangler.toml has been created and configured successfully!"
 echo ""
 echo "✅ Setup complete! Next steps:"
 echo "1. Set up MX records for your domain with ForwardEmail.net (see README for more details)"
-echo "2. Deploy with 'npm run deploy'" 
+echo "2. Deploy with 'npm run deploy'"
